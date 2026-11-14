@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient, getCurrentUser } from '@/lib/supabase/server'
+import { FIELDS } from '@/lib/listings'
 
-const FIELDS = new Set(['Engineering', 'Business', 'Technology', 'Finance', 'Healthcare', 'Other'])
+const VALID_FIELDS = new Set<string>(FIELDS)
 const LOCATIONS = new Set(['Lagos', 'Abuja', 'Remote', 'Pan-African', 'Other'])
 const DEGREE_LEVELS = new Set(['Undergraduate', 'Masters', 'PhD'])
 const FREQUENCIES = new Set(['off', 'daily', 'weekly'])
@@ -25,7 +26,7 @@ export async function saveAlertPreferences(
   const deadlineReminders = formData.get('deadline_reminders') === 'on'
 
   if (!FREQUENCIES.has(frequencyValue)) return { ok: false, message: 'Choose a valid email frequency.' }
-  if (fields.some((value) => !FIELDS.has(value))) return { ok: false, message: 'Choose valid fields.' }
+  if (fields.some((value) => !VALID_FIELDS.has(value))) return { ok: false, message: 'Choose valid fields.' }
   if (locations.some((value) => !LOCATIONS.has(value))) return { ok: false, message: 'Choose valid locations.' }
   if (degreeLevels.some((value) => !DEGREE_LEVELS.has(value))) return { ok: false, message: 'Choose valid degree levels.' }
 

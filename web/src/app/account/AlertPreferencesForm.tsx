@@ -2,8 +2,8 @@
 
 import { useActionState } from 'react'
 import { saveAlertPreferences, type AlertResult } from '../alert-actions'
+import { FIELDS } from '@/lib/listings'
 
-const FIELDS = ['Engineering', 'Business', 'Technology', 'Finance', 'Healthcare', 'Other']
 const LOCATIONS = ['Lagos', 'Abuja', 'Remote', 'Pan-African', 'Other']
 const DEGREE_LEVELS = ['Undergraduate', 'Masters', 'PhD']
 
@@ -40,7 +40,7 @@ export default function AlertPreferencesForm({ initial }: { initial: AlertPrefer
       </fieldset>
 
       <div className="grid grid-cols-3 gap-5 max-md:grid-cols-1">
-        <ChoiceGroup name="fields" title="Fields" options={FIELDS} selected={initial?.fields ?? []} />
+        <ChoiceGroup name="fields" title="Fields" options={[...FIELDS]} selected={initial?.fields ?? []} />
         <ChoiceGroup name="locations" title="Locations" options={LOCATIONS} selected={initial?.locations ?? []} />
         <ChoiceGroup name="degree_levels" title="Degree levels" options={DEGREE_LEVELS} selected={initial?.degree_levels ?? []} />
       </div>

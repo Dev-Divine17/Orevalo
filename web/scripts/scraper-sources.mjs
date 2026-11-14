@@ -1,11 +1,19 @@
 export const SCRAPER_SOURCES = [
   {
-    id: 'myjobmag-jobs',
-    name: 'MyJobMag Nigeria',
+    id: 'myjobmag-internships',
+    name: 'MyJobMag Internships',
     kind: 'listing',
-    url: 'https://www.myjobmag.com/jobs',
+    url: 'https://www.myjobmag.com/search/jobs?field=Internships',
     enabled: true,
-    notes: 'Static public jobs page. Review source terms and keep request frequency low.',
+    notes: 'MyJobMag internship field only; filter for genuine early-career roles before import.',
+  },
+  {
+    id: 'myjobmag-graduate-jobs',
+    name: 'MyJobMag Graduate Jobs',
+    kind: 'listing',
+    url: 'https://www.myjobmag.com/search/jobs?field=Graduate%20Jobs',
+    enabled: true,
+    notes: 'MyJobMag graduate-jobs field only; filter for genuine early-career roles before import.',
   },
   {
     id: 'scholars4dev-scholarships',
