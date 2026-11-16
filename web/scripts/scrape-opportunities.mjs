@@ -75,6 +75,12 @@ function decodeHtml(value) {
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
+    .replace(/&ndash;/gi, '–')
+    .replace(/&mdash;/gi, '—')
+    .replace(/&rsquo;/gi, '’')
+    .replace(/&lsquo;/gi, '‘')
+    .replace(/&rdquo;/gi, '”')
+    .replace(/&ldquo;/gi, '“')
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -301,11 +307,12 @@ function structuredValue(value) {
 }
 
 function labelRequirement(value) {
-  const heading = value.match(/^([^:]{2,60}):\s*/)?.[1]?.toLowerCase() ?? ''
+  const heading = value.match(/^([^:]{2,60}):\s+/)?.[1]?.toLowerCase() ?? ''
   if (/\b(education|degree|qualification|academic background)\b/.test(heading)) return 'Degree level'
   if (/\b(experience|work background|background)\b/.test(heading)) return 'Experience'
   if (/\b(nationality|citizenship|eligible location|residence)\b/.test(heading)) return 'Eligible location'
   if (/\b(field of study|course of study|discipline|area of study)\b/.test(heading)) return 'Field of study'
+  if (/\b(?:first class|second class|2\s*[:/]\s*[12]|upper division|lower division)\b/i.test(value)) return 'Academic standing'
   if (/\b(master|bachelor|degree|diploma|academic qualification)\b/i.test(value)) return 'Degree level'
   if (/\b(nationality|citizenship|citizens? from|citizen of|national of|non-eu\/eea countries)\b/i.test(value)) return 'Nationality'
   if (/\b(applicants? must (?:be based|reside|live)|open to (?:applicants|citizens|nationals)|eligible in|willingness to work (?:in|on|across)|assignment in)\b/i.test(value)) return 'Eligible location'
@@ -321,7 +328,7 @@ function labelRequirement(value) {
 function isRequirementStatement(value) {
   const detail = value.trim()
   if (!detail || detail.length > 500) return false
-  const statement = detail.replace(/^[^:]{2,60}:\s*/, '').trim()
+  const statement = detail.replace(/^([^:\n]{2,60}):\s+/, '').trim()
   if (/^(?:execute|conduct|visit|record|support|ensure|use|work|assist|supervise|lead|implement|physically confirm|track|monitor|facilitate|carry out|provide|serve as|manage|coordinate|handle|perform|follow up)\b/i.test(statement)) {
     return false
   }
@@ -363,6 +370,20 @@ function requirementsFromPosting(jobPosting, description) {
     }
   }
   return requirements
+}
+
+function descriptionWithoutRequirements(description, requirements) {
+  const requirementDetails = new Set(
+    requirements.map(({ detail }) => detail.replace(/\s+/g, ' ').trim().toLowerCase()),
+  )
+  const lines = String(description ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-•]\s*/, '').trim())
+    .filter((line) => {
+      if (!line || /^(?:eligibility\s+)?requirements?\s*:?\s*$/i.test(line)) return false
+      return !requirementDetails.has(line.replace(/\s+/g, ' ').toLowerCase())
+    })
+  return lines.join('\n').trim() || null
 }
 
 function sectionBulletPoints(html, label) {
@@ -522,7 +543,11 @@ export function extractMyJobMagListing(detailHtml, sourceUrl) {
   const structuredLocation = locationText(jobPosting?.jobLocation)
   const locationLine = firstString(structuredLocation, jobPosting?.jobLocationType)
   const deadline = isoDate(jobPosting.validThrough) ?? isoDate(detailHtml.match(/\bDeadline:\s*([^<\r\n]+)/i)?.[1]) ?? dateAfterLabel(htmlText(detailHtml), 'Deadline')
-  const description = opportunityDescription(jobPosting.description)
+  const requirements = requirementsFromPosting(jobPosting, jobPosting.description)
+  const description = descriptionWithoutRequirements(
+    opportunityDescription(jobPosting.description),
+    requirements,
+  )
   const normalizedTitle = title.replace(/\s+at\s+.+$/i, '').trim()
   const normalizedCompany = company.replace(/\s+\|\s+MyJobMag.*$/i, '').trim()
 
@@ -544,7 +569,7 @@ export function extractMyJobMagListing(detailHtml, sourceUrl) {
     apply_url: preferredApplyUrl(detailHtml, sourceUrl, '') || myJobMagApplyRedirectUrl(detailHtml, sourceUrl),
     description,
     experienceRequirements: jobPosting.experienceRequirements,
-    requirements: requirementsFromPosting(jobPosting, jobPosting.description),
+    requirements,
   }
 }
 

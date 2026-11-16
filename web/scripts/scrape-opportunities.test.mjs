@@ -638,6 +638,41 @@ describe('Opportunity source extraction', () => {
     expect(record.requirements).toHaveLength(3)
   })
 
+  it('extracts Egbin academic standing, decodes entities, and avoids repeating eligibility text', () => {
+    const description = `<p><strong>Eligibility Requirements</strong></p>
+      <ul>
+        <li>Must be an undergraduate student.</li>
+        <li>Must have a minimum of Second Class Upper (2:1) or its equivalent at the time of application.</li>
+        <li>Must be available for the internship period (January &ndash; June 2027).</li>
+        <li>Must be studying one of the eligible disciplines.</li>
+      </ul>`
+    const record = extractMyJobMagListing(`
+      <script type="application/ld+json">
+        ${JSON.stringify({
+          '@type': 'JobPosting',
+          title: 'Mechanical Maintenance Intern (SIWES)',
+          hiringOrganization: { name: 'Egbin Power Plc' },
+          validThrough: '2026-11-30T23:59:59+00:00',
+          jobLocation: { address: { addressLocality: 'Lagos', addressCountry: 'NG' } },
+          occupationalCategory: 'Engineering',
+          description,
+        })}
+      </script>
+      <a href="/apply-now/123">Egbin Power Plc on forms.cloud.microsoft</a>
+    `, 'https://www.myjobmag.com/job/mechanical-maintenance-intern-siwes-egbin-power-plc')
+
+    expect(record.description).toBeNull()
+    expect(record.requirements).toEqual([
+      { label: 'Requirement', detail: 'Must be an undergraduate student.' },
+      {
+        label: 'Academic standing',
+        detail: 'Must have a minimum of Second Class Upper (2:1) or its equivalent at the time of application.',
+      },
+      { label: 'Requirement', detail: 'Must be available for the internship period (January – June 2027).' },
+      { label: 'Requirement', detail: 'Must be studying one of the eligible disciplines.' },
+    ])
+  })
+
   it('recognizes safety roles without misclassifying them as healthcare and keeps criteria, not duties', () => {
     const html = `
       <script type="application/ld+json">
