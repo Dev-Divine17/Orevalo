@@ -484,6 +484,8 @@ describe('Opportunity source extraction', () => {
     expect(inferField('Finance and Accounts Officer')).toBe('Finance')
     expect(inferField('Hotel Cook')).toBe('Hospitality')
     expect(inferField('Teacher using digital learning tools')).toBe('Education')
+    expect(inferField('Chemistry Intern')).toBe('Science')
+    expect(inferField('Graduate Assistant in Parasitology and Entomology')).toBe('Science')
   })
 
   it('prioritizes the listing title over conflicting classification metadata', () => {
@@ -501,6 +503,23 @@ describe('Opportunity source extraction', () => {
     `, 'https://www.myjobmag.com/job/hotel-cook-graduate-trainee')
 
     expect(record.field).toBe('Hospitality')
+  })
+
+  it('classifies science roles from the title even when source metadata says Engineering', () => {
+    const record = extractMyJobMagListing(`
+      <script type="application/ld+json">
+        ${JSON.stringify({
+          '@type': 'JobPosting',
+          title: 'Chemistry Intern (SIWES)',
+          validThrough: '2027-01-15',
+          hiringOrganization: { name: 'Example Employer' },
+          occupationalCategory: 'Engineering',
+          description: '<p>Undergraduate chemistry placement.</p>',
+        })}
+      </script>
+    `, 'https://www.myjobmag.com/job/chemistry-intern')
+
+    expect(record.field).toBe('Science')
   })
 
   it('ignores the MyJobMag share-widget heading when choosing the job title', () => {

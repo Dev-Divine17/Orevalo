@@ -14,6 +14,7 @@ export const FIELDS = [
   'Healthcare',
   'Education',
   'Hospitality',
+  'Science',
   'Other',
 ] as const
 export const LOCATIONS = ['Lagos', 'Abuja', 'Remote', 'Pan-African', 'Other'] as const

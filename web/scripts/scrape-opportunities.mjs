@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 
 const DEFAULT_USER_AGENT = 'OrevaloOpportunityBot/1.0 (+https://orevalo.com/contact)'
-const LISTING_FIELDS = ['Engineering', 'Business', 'Technology', 'Finance', 'Healthcare', 'Education', 'Hospitality', 'Other']
+const LISTING_FIELDS = ['Engineering', 'Business', 'Technology', 'Finance', 'Healthcare', 'Education', 'Hospitality', 'Science', 'Other']
 const LISTING_LOCATIONS = ['Lagos', 'Abuja', 'Remote', 'Pan-African', 'Other']
 const SCHOLARSHIP_COUNTRIES = ['Pan-African', 'Nigeria', 'Ghana', 'Kenya', 'South Africa', 'Other']
 const SCHOLARSHIP_FIELDS = ['Any', 'Engineering', 'Business', 'Technology', 'Finance', 'Healthcare']
@@ -15,6 +15,7 @@ const LISTING_FIELD_KEYWORDS = {
   Healthcare: ['healthcare', 'medical', 'pharmaceutical', 'nurse', 'doctor', 'clinical', 'hospital', 'clinic', 'caregiver', 'health'],
   Education: ['teacher', 'teaching', 'educator', 'lecturer', 'tutor', 'education', 'school'],
   Hospitality: ['hotel', 'cook', 'chef', 'hospitality', 'catering', 'restaurant', 'kitchen', 'food service', 'waiter', 'waitress'],
+  Science: ['chemistry', 'chemist', 'biology', 'biological sciences', 'microbiology', 'parasitology', 'entomology', 'science laboratory', 'laboratory science'],
   Finance: ['finance', 'account', 'audit', 'banking', 'business analysis', 'insurance', 'treasury', 'risk management', 'compliance', 'procurement', 'storekeeping', 'supply chain'],
   Business: ['business', 'sales', 'marketing', 'management', 'operations', 'human resources', 'hr', 'project management', 'customer care', 'consultancy', 'administration', 'logistics', 'strategic', 'product management', 'communications', 'public relations'],
   Technology: ['technology', 'software', 'ai', 'artificial intelligence', 'data', 'ict', 'computer', 'digital', 'product', 'design', 'ux', 'creative', 'media production', 'filmmaker', 'grok', 'capcut', 'programming', 'cybersecurity', 'analytics', 'editorial'],
@@ -154,6 +155,7 @@ export function inferField(text) {
   if (!lower) return 'Other'
   if (/\b(?:teacher|teaching|educator|lecturer|tutor|education|school)\b/i.test(lower)) return 'Education'
   if (/\b(?:hotel|cook|chef|hospitality|catering|restaurant|kitchen|food service|waiter|waitress)\b/i.test(lower)) return 'Hospitality'
+  if (/\b(?:chemistry|chemist|biology|biological sciences|microbiology|parasitology|entomology|science laboratory|laboratory science)\b/i.test(lower)) return 'Science'
   for (const field of LISTING_FIELDS) {
     const keywords = LISTING_FIELD_KEYWORDS[field] ?? []
     if (keywords.some((keyword) => lower.includes(keyword))) return field
