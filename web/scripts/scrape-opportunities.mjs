@@ -695,7 +695,14 @@ export async function extractScholars4DevScholarships(indexHtml, sourceUrl) {
         console.warn(`[scraper] using Scholars4Dev source link for ${detailUrl}: ${error.message}`)
       }
       const scholarshipPosting = jsonLdValues(detailHtml).find((item) => item?.['@type'] !== 'JobPosting' && item?.name) ?? null
-      const detailDescription = opportunityDescription(scholarshipPosting?.description ?? '')
+      const articleHtml = detailHtml.match(/<div\b[^>]*class=["'][^"']*\bentry-content\b[^"']*["'][^>]*>([\s\S]*?)(?:<div\b[^>]*class=["'][^"']*\b(?:post-share|share-box)\b|<\/article>)/i)?.[1] ?? detailHtml
+      const articleDescription = opportunityDescription(articleHtml).split(/\r?\n/).filter((line) => !/^read more$/i.test(line)).join('\n').trim()
+      const structuredDescription = opportunityDescription(scholarshipPosting?.description ?? '')
+      const detailDescription = articleDescription.length >= 120
+        ? articleDescription
+        : structuredDescription.length >= 120
+          ? structuredDescription
+          : articleDescription || structuredDescription
       const detailEligibility = sectionBulletPoints(detailHtml, 'Eligibility')
       const structuredEligibility = firstString(
         structuredValue(scholarshipPosting?.eligibilityRequirements),

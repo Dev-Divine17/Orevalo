@@ -1,9 +1,15 @@
 import type { OpportunityRequirement } from '@/lib/opportunity-requirements'
 
-export default function OpportunityRequirements({ requirements }: { requirements: OpportunityRequirement[] }) {
+export default function OpportunityRequirements({
+  requirements,
+  heading = 'Requirements',
+}: {
+  requirements: OpportunityRequirement[]
+  heading?: string
+}) {
   return (
     <section className="mt-10 border-y border-line py-7" aria-labelledby="requirements-heading">
-      <h2 id="requirements-heading" className="font-display text-2xl font-semibold">Requirements</h2>
+      <h2 id="requirements-heading" className="font-display text-2xl font-semibold">{heading}</h2>
       {requirements.length ? (
         <ul className="mt-4 space-y-3">
           {requirements.map(({ label, detail }, index) => (

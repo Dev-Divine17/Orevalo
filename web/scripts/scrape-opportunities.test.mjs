@@ -316,6 +316,45 @@ describe('Opportunity source extraction', () => {
     }
   })
 
+  it('uses the full article body when the scholarship structured description is only a Read More teaser', async () => {
+    const indexUrl = 'https://www.scholars4dev.com/scholarships/'
+    const detailUrl = 'https://www.scholars4dev.com/example-scholarship/'
+    const article = `<article><div class="entry-content">
+      <h2>Example University Scholarship</h2>
+      <p>This award supports international students pursuing undergraduate study.</p>
+      <h3>Award Amount</h3><p>Full tuition fees</p>
+      <h3>Number of Awards</h3><p>Ten awards are available.</p>
+      <h3>Eligible Countries</h3><p>Nigeria and Ghana</p>
+      <h3>Eligibility</h3><ul><li>Applicants must hold an undergraduate offer.</li></ul>
+      <h3>How to Apply</h3><ol><li>Complete the university application form.</li></ol>
+    </div></article>`
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = vi.fn(async () => new Response(`
+      <script type="application/ld+json">${JSON.stringify({
+        '@type': 'Scholarship',
+        name: 'Example University Scholarship',
+        description: 'Read More',
+      })}</script>
+      ${article}
+    `, { status: 200 }))
+
+    try {
+      const records = await extractScholars4DevScholarships(
+        `<h2><a href="${detailUrl}">Example University Scholarship</a></h2>
+          <p>Example University Masters Degree</p>
+          <p>Deadline: 15 Dec 2026</p>`,
+        indexUrl,
+      )
+
+      expect(records).toHaveLength(1)
+      expect(records[0].description).toContain('Full tuition fees')
+      expect(records[0].description).toContain('Complete the university application form')
+      expect(records[0].description).not.toBe('Read More')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
   it('reads titles, detail URLs, and category labels from the RSS feed', () => {
     const entries = opportunityDeskFeedEntries(`
       <rss><channel><item>
