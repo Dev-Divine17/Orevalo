@@ -44,6 +44,24 @@ export async function GET(request: NextRequest) {
         },
       })
     }
+    console.info('[scrape-cron] completed', JSON.stringify({
+      dryRun,
+      inserted,
+      notified,
+      failed: failed.length,
+      results: results.map((result) => (
+        'error' in result
+          ? { source: result.source, error: result.error }
+          : {
+              source: result.source,
+              kind: result.kind,
+              extracted: result.extracted,
+              valid: result.valid,
+              inserted: 'inserted' in result ? Number(result.inserted ?? 0) : 0,
+              duplicates: 'duplicates' in result ? Number(result.duplicates ?? 0) : 0,
+            }
+      )),
+    }))
     return NextResponse.json({ ok: failed.length === 0, dryRun, inserted, notified, results }, { status: failed.length ? 502 : 200 })
   } catch (error) {
     console.error('[scrape-cron] failed:', error)
