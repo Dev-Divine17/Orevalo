@@ -45,19 +45,35 @@ export async function GET(request: NextRequest) {
     let notified = false
     const adminEmail = process.env.SCRAPER_ADMIN_EMAIL
     if (!dryRun && inserted > 0 && isMailerConfigured && adminEmail) {
-      const baseUrl = await siteUrl()
-      notified = await sendScraperPendingEmail({
-        to: adminEmail,
+      try {
+        const baseUrl = await siteUrl()
+        notified = await sendScraperPendingEmail({
+          to: adminEmail,
+          inserted,
+          sources: results
+            .filter((result) => 'inserted' in result)
+            .map((result) => ({ source: result.source, inserted: Number(result.inserted ?? 0) })),
+          reviewUrls: {
+            listings: `${baseUrl}/admin/listings?status=pending`,
+            scholarships: `${baseUrl}/admin/scholarships?status=pending`,
+          },
+        })
+      } catch (error) {
+        console.error('[scrape-cron] notification failed:', error)
+      }
+    }
+
+    const { error: historyError } = await createAdminClient()
+      .from('scraper_runs')
+      .insert({
+        dry_run: dryRun,
         inserted,
-        sources: results
-          .filter((result) => 'inserted' in result)
-          .map((result) => ({ source: result.source, inserted: Number(result.inserted ?? 0) })),
-        reviewUrls: {
-          listings: `${baseUrl}/admin/listings?status=pending`,
-          scholarships: `${baseUrl}/admin/scholarships?status=pending`,
-        },
+        notified,
+        failed_sources: failed.length,
+        results: sourceResults,
       })
     if (historyError) throw historyError
+
     console.info('[scrape-cron] completed', JSON.stringify({
       dryRun,
       inserted,
