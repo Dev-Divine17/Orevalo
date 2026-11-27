@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SCRAPER_SOURCES } from '../../../../../scripts/scraper-sources.mjs'
 import { isMailerConfigured, sendScraperPendingEmail, siteUrl } from '@/lib/email'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,18 @@ export async function GET(request: NextRequest) {
 
     const failed = results.filter((result) => 'error' in result)
     const inserted = results.reduce((total, result) => total + ('inserted' in result ? Number(result.inserted ?? 0) : 0), 0)
+    const sourceResults = results.map((result) => (
+      'error' in result
+        ? { source: String(result.source), error: String(result.error) }
+        : {
+            source: String(result.source),
+            kind: 'kind' in result ? String(result.kind) : 'unknown',
+            extracted: Number(result.extracted ?? 0),
+            valid: Number(result.valid ?? 0),
+            inserted: 'inserted' in result ? Number(result.inserted ?? 0) : 0,
+            duplicates: 'duplicates' in result ? Number(result.duplicates ?? 0) : 0,
+          }
+    ))
     let notified = false
     const adminEmail = process.env.SCRAPER_ADMIN_EMAIL
     if (!dryRun && inserted > 0 && isMailerConfigured && adminEmail) {
@@ -44,7 +57,14 @@ export async function GET(request: NextRequest) {
           scholarships: `${baseUrl}/admin/scholarships?status=pending`,
         },
       })
-    }
+    if (historyError) throw historyError
+    console.info('[scrape-cron] completed', JSON.stringify({
+      dryRun,
+      inserted,
+      notified,
+      failed: failed.length,
+      results: sourceResults,
+    }))
     return NextResponse.json({ ok: failed.length === 0, dryRun, inserted, notified, results }, { status: failed.length ? 502 : 200 })
   } catch (error) {
     console.error('[scrape-cron] failed:', error)

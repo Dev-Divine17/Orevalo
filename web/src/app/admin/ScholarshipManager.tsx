@@ -69,6 +69,7 @@ export function ScholarshipRowItem({ scholarship }: { scholarship: ScholarshipRo
   const [rejectReason, setRejectReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const summary = scholarship.description || scholarship.eligibility
 
   function run(fn: () => Promise<ActionResult>) {
     setError(null)
@@ -90,6 +91,7 @@ export function ScholarshipRowItem({ scholarship }: { scholarship: ScholarshipRo
           {scholarship.featured && <span className="rounded-full bg-moss/10 px-2.5 py-0.5 text-[0.68rem] font-bold text-moss uppercase">Featured</span>}
         </div>
         <h3 className="font-display text-[1.1rem] font-semibold">{scholarship.name}</h3>
+        {summary && <p className="mt-2 line-clamp-3 max-w-3xl text-[0.88rem] leading-[1.6] text-muted">{summary}</p>}
         <p className="mt-1 text-[0.85rem] text-muted">{scholarship.country} · {scholarship.degree_level}{scholarship.deadline ? ` · Deadline ${formatDeadline(scholarship.deadline)}` : ' · Rolling deadline'}</p>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2">

@@ -10,8 +10,124 @@ import {
   preferredApplyUrl,
   scrapeSource,
 } from './scrape-opportunities.mjs'
+import { SCRAPER_SOURCES } from './scraper-sources.mjs'
 
 describe('Opportunity source extraction', () => {
+  it('uses the dedicated MyJobMag internship and graduate sections', () => {
+    expect(SCRAPER_SOURCES.filter(({ id }) => id.startsWith('myjobmag-'))).toEqual([
+      expect.objectContaining({
+        id: 'myjobmag-internships',
+        url: 'https://www.myjobmag.com/search/jobs?field=Internships',
+        enabled: true,
+      }),
+      expect.objectContaining({
+        id: 'myjobmag-graduate-jobs',
+        url: 'https://www.myjobmag.com/search/jobs?field=Graduate%20Jobs',
+        enabled: true,
+      }),
+    ])
+    expect(SCRAPER_SOURCES.find(({ id }) => id === 'opportunity-desk-internships')).toMatchObject({
+      enabled: true,
+      url: 'https://opportunitydesk.org/category/jobs-and-internships/internships/feed/',
+    })
+  })
+
+  it('imports only eligible entry-level listings from MyJobMag graduate results', async () => {
+    const indexUrl = 'https://www.myjobmag.com/search/jobs?field=Graduate%20Jobs'
+    const acceptedUrl = 'https://www.myjobmag.com/job/electrical-engineer-graduate-trainee-julius-berger'
+    const secondAcceptedUrl = 'https://www.myjobmag.com/job/graduate-mechanical-trainee-example'
+    const acceptedApplicationUrl = 'https://www.myjobmag.com/apply-now/12345'
+    const experiencedUrl = 'https://www.myjobmag.com/job/graduate-accountant-example'
+    const seniorUrl = 'https://www.myjobmag.com/job/chief-financial-officer-graduate-programme'
+    const textExperienceUrl = 'https://www.myjobmag.com/job/graduate-audit-trainee-example'
+    const makeDetail = ({ title, experienceRequirements, description }) => `
+      <script type="application/ld+json">
+        ${JSON.stringify({
+          '@type': 'JobPosting',
+          title,
+          validThrough: '2027-01-15',
+          hiringOrganization: { name: 'Example Employer' },
+          occupationalCategory: 'Engineering',
+          experienceRequirements,
+          description,
+        })}
+      </script>
+      <a href="${acceptedApplicationUrl}">Example Employer on forms.example.com</a>
+    `
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url) => {
+      const pages = new Map([
+        [indexUrl, `<a href="${acceptedUrl}">Graduate Trainee</a>
+          <a href="${secondAcceptedUrl}">Graduate Mechanical Trainee</a>
+          <a href="${experiencedUrl}">Graduate Accountant</a>
+          <a href="${seniorUrl}">Chief Financial Officer Graduate Programme</a>
+          <a href="${textExperienceUrl}">Graduate Audit Trainee</a>`],
+        [acceptedUrl, makeDetail({
+          title: 'Julius Berger Electrical Engineer Graduate Trainee Programme 2026',
+          experienceRequirements: { monthsOfExperience: 12 },
+          description: '<p>0-1 year of work experience. Practical electrical maintenance is an advantage.</p>',
+        })],
+        [secondAcceptedUrl, makeDetail({
+          title: 'Graduate Mechanical Trainee',
+          experienceRequirements: {},
+          description: '<p>No prior experience required.</p>',
+        })],
+        [experiencedUrl, makeDetail({
+          title: 'Graduate Accountant',
+          experienceRequirements: { yearsOfExperience: 3 },
+          description: '<p>Applicants must have relevant experience.</p>',
+        })],
+        [seniorUrl, makeDetail({
+          title: 'Chief Financial Officer Graduate Programme',
+          experienceRequirements: {},
+          description: '<p>Graduate programme.</p>',
+        })],
+        [textExperienceUrl, makeDetail({
+          title: 'Graduate Audit Trainee',
+          experienceRequirements: {},
+          description: '<p>Applicants need 2-3 years of relevant work experience.</p>',
+        })],
+      ])
+      if (String(url) === acceptedApplicationUrl) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://careers.example.com/apply' },
+        })
+      }
+      return new Response(pages.get(String(url)) ?? '', { status: 200 })
+    })
+
+    try {
+      const summary = await scrapeSource({
+        sourceUrl: indexUrl,
+        kind: 'listing',
+        sourceName: 'MyJobMag Graduate Jobs',
+        dryRun: true,
+      })
+
+      expect(summary).toMatchObject({ extracted: 2, valid: 2, dryRun: true })
+      expect(globalThis.fetch).toHaveBeenCalledTimes(8)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('rejects broad MyJobMag jobs pages instead of scraping them', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = vi.fn(async () => new Response('<html></html>', { status: 200 }))
+
+    try {
+      await expect(scrapeSource({
+        sourceUrl: 'https://www.myjobmag.com/jobs',
+        kind: 'listing',
+        sourceName: 'MyJobMag',
+        dryRun: true,
+      })).rejects.toThrow('MyJobMag sources must target the Internships or Graduate Jobs field.')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
   it('extracts AfterSchoolAfrica scholarships for Africans with official apply links', () => {
     const applyUrl = 'https://jobs.mercedes-benz.com/south-africa-bursary'
     const record = extractAfterSchoolAfricaScholarship({
@@ -200,6 +316,45 @@ describe('Opportunity source extraction', () => {
     }
   })
 
+  it('uses the full article body when the scholarship structured description is only a Read More teaser', async () => {
+    const indexUrl = 'https://www.scholars4dev.com/scholarships/'
+    const detailUrl = 'https://www.scholars4dev.com/example-scholarship/'
+    const article = `<article><div class="entry-content">
+      <h2>Example University Scholarship</h2>
+      <p>This award supports international students pursuing undergraduate study.</p>
+      <h3>Award Amount</h3><p>Full tuition fees</p>
+      <h3>Number of Awards</h3><p>Ten awards are available.</p>
+      <h3>Eligible Countries</h3><p>Nigeria and Ghana</p>
+      <h3>Eligibility</h3><ul><li>Applicants must hold an undergraduate offer.</li></ul>
+      <h3>How to Apply</h3><ol><li>Complete the university application form.</li></ol>
+    </div></article>`
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = vi.fn(async () => new Response(`
+      <script type="application/ld+json">${JSON.stringify({
+        '@type': 'Scholarship',
+        name: 'Example University Scholarship',
+        description: 'Read More',
+      })}</script>
+      ${article}
+    `, { status: 200 }))
+
+    try {
+      const records = await extractScholars4DevScholarships(
+        `<h2><a href="${detailUrl}">Example University Scholarship</a></h2>
+          <p>Example University Masters Degree</p>
+          <p>Deadline: 15 Dec 2026</p>`,
+        indexUrl,
+      )
+
+      expect(records).toHaveLength(1)
+      expect(records[0].description).toContain('Full tuition fees')
+      expect(records[0].description).toContain('Complete the university application form')
+      expect(records[0].description).not.toBe('Read More')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
   it('reads titles, detail URLs, and category labels from the RSS feed', () => {
     const entries = opportunityDeskFeedEntries(`
       <rss><channel><item>
@@ -313,6 +468,39 @@ describe('Opportunity source extraction', () => {
       expect(record).toBeNull()
     })
 
+    it('rejects senior, experienced, non-internship, and aggregator-apply posts', () => {
+      const sourceUrl = 'https://opportunitydesk.org/sample/'
+      const entry = (title, description = '') => ({
+        title,
+        description,
+        categories: ['Internships', 'Africa'],
+      })
+
+      expect(extractOpportunityDeskListing(
+        '<p>Deadline: October 31, 2026</p><a href="https://careers.example.com/apply">Apply now</a>',
+        sourceUrl,
+        entry('Chief Operating Officer Internship'),
+      )).toBeNull()
+
+      expect(extractOpportunityDeskListing(
+        '<div class="entry-content"><p>Deadline: October 31, 2026</p><h3>Requirements</h3><ul><li>At least 3 years of professional experience.</li></ul><a href="https://careers.example.com/apply">Apply now</a></div>',
+        sourceUrl,
+        entry('Research Internship'),
+      )).toBeNull()
+
+      expect(extractOpportunityDeskListing(
+        '<p>Deadline: October 31, 2026</p><a href="https://careers.example.com/apply">Apply now</a>',
+        sourceUrl,
+        entry('Graduate Trainee Programme'),
+      )).toBeNull()
+
+      expect(extractOpportunityDeskListing(
+        '<p>Deadline: October 31, 2026</p><a href="https://www.myjobmag.com/job/example">Apply now</a>',
+        sourceUrl,
+        entry('Research Internship'),
+      )).toBeNull()
+    })
+
     it('chooses an institution application link over the source listing and social links', () => {
       const sourceUrl = 'https://www.scholars4dev.com/2026/10/21/chalmers-ipoet-scholarships-for-international-students/'
       const html = `
@@ -333,6 +521,44 @@ describe('Opportunity source extraction', () => {
     expect(inferField('AI Filmmaker using Grok and CapCut')).toBe('Technology')
     expect(inferField('Senior Project Manager - Sales & Marketing')).toBe('Business')
     expect(inferField('Finance and Accounts Officer')).toBe('Finance')
+    expect(inferField('Hotel Cook')).toBe('Hospitality')
+    expect(inferField('Teacher using digital learning tools')).toBe('Education')
+    expect(inferField('Chemistry Intern')).toBe('Science')
+    expect(inferField('Graduate Assistant in Parasitology and Entomology')).toBe('Science')
+  })
+
+  it('prioritizes the listing title over conflicting classification metadata', () => {
+    const record = extractMyJobMagListing(`
+      <script type="application/ld+json">
+        ${JSON.stringify({
+          '@type': 'JobPosting',
+          title: 'Hotel Cook Graduate Trainee',
+          validThrough: '2027-01-15',
+          hiringOrganization: { name: 'Example Hotel' },
+          occupationalCategory: 'Healthcare Technology',
+          description: '<p>Graduate trainee role in a hotel kitchen.</p>',
+        })}
+      </script>
+    `, 'https://www.myjobmag.com/job/hotel-cook-graduate-trainee')
+
+    expect(record.field).toBe('Hospitality')
+  })
+
+  it('classifies science roles from the title even when source metadata says Engineering', () => {
+    const record = extractMyJobMagListing(`
+      <script type="application/ld+json">
+        ${JSON.stringify({
+          '@type': 'JobPosting',
+          title: 'Chemistry Intern (SIWES)',
+          validThrough: '2027-01-15',
+          hiringOrganization: { name: 'Example Employer' },
+          occupationalCategory: 'Engineering',
+          description: '<p>Undergraduate chemistry placement.</p>',
+        })}
+      </script>
+    `, 'https://www.myjobmag.com/job/chemistry-intern')
+
+    expect(record.field).toBe('Science')
   })
 
   it('ignores the MyJobMag share-widget heading when choosing the job title', () => {
@@ -449,6 +675,41 @@ describe('Opportunity source extraction', () => {
       detail: 'Field Supervision Background: Proven experience training field enumerators is required.',
     })
     expect(record.requirements).toHaveLength(3)
+  })
+
+  it('extracts Egbin academic standing, decodes entities, and avoids repeating eligibility text', () => {
+    const description = `<p><strong>Eligibility Requirements</strong></p>
+      <ul>
+        <li>Must be an undergraduate student.</li>
+        <li>Must have a minimum of Second Class Upper (2:1) or its equivalent at the time of application.</li>
+        <li>Must be available for the internship period (January &ndash; June 2027).</li>
+        <li>Must be studying one of the eligible disciplines.</li>
+      </ul>`
+    const record = extractMyJobMagListing(`
+      <script type="application/ld+json">
+        ${JSON.stringify({
+          '@type': 'JobPosting',
+          title: 'Mechanical Maintenance Intern (SIWES)',
+          hiringOrganization: { name: 'Egbin Power Plc' },
+          validThrough: '2026-11-30T23:59:59+00:00',
+          jobLocation: { address: { addressLocality: 'Lagos', addressCountry: 'NG' } },
+          occupationalCategory: 'Engineering',
+          description,
+        })}
+      </script>
+      <a href="/apply-now/123">Egbin Power Plc on forms.cloud.microsoft</a>
+    `, 'https://www.myjobmag.com/job/mechanical-maintenance-intern-siwes-egbin-power-plc')
+
+    expect(record.description).toBeNull()
+    expect(record.requirements).toEqual([
+      { label: 'Requirement', detail: 'Must be an undergraduate student.' },
+      {
+        label: 'Academic standing',
+        detail: 'Must have a minimum of Second Class Upper (2:1) or its equivalent at the time of application.',
+      },
+      { label: 'Requirement', detail: 'Must be available for the internship period (January – June 2027).' },
+      { label: 'Requirement', detail: 'Must be studying one of the eligible disciplines.' },
+    ])
   })
 
   it('recognizes safety roles without misclassifying them as healthcare and keeps criteria, not duties', () => {

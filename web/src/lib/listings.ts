@@ -6,7 +6,17 @@
  * from here would break any client component that needs FIELDS or formatDeadline.
  */
 
-export const FIELDS = ['Engineering', 'Business', 'Technology', 'Finance', 'Healthcare', 'Other'] as const
+export const FIELDS = [
+  'Engineering',
+  'Business',
+  'Technology',
+  'Finance',
+  'Healthcare',
+  'Education',
+  'Hospitality',
+  'Science',
+  'Other',
+] as const
 export const LOCATIONS = ['Lagos', 'Abuja', 'Remote', 'Pan-African', 'Other'] as const
 
 export type Field = (typeof FIELDS)[number]

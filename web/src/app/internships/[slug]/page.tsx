@@ -30,7 +30,7 @@ export default async function InternshipDetail({ params, searchParams }: { param
     <h1 className="mt-3 font-display text-4xl font-semibold">{listing.title}</h1>
     <p className="mt-4 text-muted">{listing.location} · {listing.field} · Deadline {formatDeadline(listing.deadline)}</p>
     <OpportunityRequirements requirements={normalizeRequirements(listing.requirements)} />
-    <p className="mt-10 whitespace-pre-wrap text-[1rem] leading-[1.8] text-muted">{listing.description ?? 'Review the role details and apply through the original provider.'}</p>
+    {listing.description && <p className="mt-10 whitespace-pre-wrap text-[1rem] leading-[1.8] text-muted">{listing.description}</p>}
     <OpportunityActions kind="listing" opportunityId={listing.id} applyUrl={listing.apply_url} />
     {listing.source_name && <p className="mt-6 text-sm text-muted">Source: {listing.source_url ? <a href={listing.source_url} className="text-clay">{listing.source_name}</a> : listing.source_name}{listing.verified_at ? ` · Verified ${new Date(listing.verified_at).toLocaleDateString('en-GB')}` : ''}</p>}
   </main>

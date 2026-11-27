@@ -16,6 +16,14 @@ export type UserRole = 'student' | 'admin'
 
 export type ReviewStatus = 'pending' | 'published' | 'rejected' | 'archived'
 
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | Json[]
+  | { [key: string]: Json | undefined }
+
 export type ListingRow = {
   id: string
   slug: string
@@ -263,6 +271,16 @@ export type OpportunityEventRow = {
   created_at: string
 }
 
+export type ScraperRunRow = {
+  id: string
+  created_at: string
+  dry_run: boolean
+  inserted: number
+  notified: boolean
+  failed_sources: number
+  results: Json
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -330,6 +348,12 @@ export type Database = {
         Row: OpportunityEventRow
         Insert: Omit<OpportunityEventRow, 'id' | 'created_at'> & { id?: string; created_at?: string }
         Update: Partial<Omit<OpportunityEventRow, 'id'>>
+        Relationships: []
+      }
+      scraper_runs: {
+        Row: ScraperRunRow
+        Insert: Omit<ScraperRunRow, 'id' | 'created_at'> & { id?: string; created_at?: string }
+        Update: Partial<Omit<ScraperRunRow, 'id'>>
         Relationships: []
       }
     }
